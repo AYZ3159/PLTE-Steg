@@ -1,0 +1,628 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Indexed PNG Palette Stego</title>
+<style>
+:root{
+  --bg:#0b1020;
+  --panel:#151b2f;
+  --panel2:#0f1526;
+  --text:#eef3ff;
+  --muted:#9aa8c7;
+  --accent:#6aa2ff;
+  --accent2:#8ab6ff;
+  --border:#2a3555;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{
+  margin:0;
+  background:
+    radial-gradient(circle at top left, rgba(106,162,255,.18), transparent 42rem),
+    linear-gradient(180deg, #0b1020 0%, #111a31 100%);
+  color:var(--text);
+  font:14px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+main{
+  max-width:1120px;
+  margin:0 auto;
+  padding:14px 16px;
+}
+.header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:12px;
+}
+h1{margin:0 0 4px;font-size:26px}
+h2{margin:0 0 12px;font-size:19px}
+p{color:var(--muted);margin:0}
+.tabs{
+  display:flex;
+  gap:8px;
+  margin:0;
+  flex:0 0 auto;
+}
+.tab{
+  border:1px solid var(--border);
+  background:#0a0f1e;
+  color:var(--text);
+  padding:8px 15px;
+  border-radius:999px;
+  cursor:pointer;
+  font-weight:700;
+  box-shadow:none;
+}
+.tab.active{
+  background:#0a0f1e;
+  border-color:#75a8ff;
+  color:#fff;
+  box-shadow:0 0 0 1px rgba(117,168,255,.7), 0 0 14px rgba(117,168,255,.28);
+}
+.section{display:none}
+.section.active{display:block}
+.layout{
+  display:grid;
+  grid-template-columns:1.1fr .9fr;
+  gap:14px;
+}
+.card{
+  background:rgba(21,27,47,.96);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:15px;
+  box-shadow:0 14px 34px rgba(0,0,0,.22);
+}
+label{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  margin:10px 0 5px;
+}
+input[type="file"],input[type="text"],textarea{
+  width:100%;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#0a0f1e;
+  color:var(--text);
+  padding:9px;
+}
+textarea{min-height:128px;resize:vertical}
+.message-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin:10px 0 5px;
+}
+.message-row label{margin:0}
+#charCounter{
+  color:var(--muted);
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+}
+#charCounter.over{color:#ff7070}
+button:disabled{
+  opacity:.45;
+  cursor:not-allowed;
+}
+button,a.button{
+  display:inline-block;
+  margin-top:12px;
+  margin-right:8px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:#0a0f1e;
+  color:white;
+  padding:8px 12px;
+  font-size:13px;
+  line-height:1.2;
+  font-weight:800;
+  cursor:pointer;
+  text-decoration:none;
+}
+button:hover,a.button:hover{background:#0a0f1e}
+.card button,
+.card a.button{
+  min-width:92px;
+  text-align:center;
+}
+pre{
+  min-height:220px;
+  max-height:calc(100vh - 190px);
+  overflow:auto;
+  margin:0;
+  white-space:pre-wrap;
+  word-break:break-word;
+  color:var(--text);
+  background:#080c16;
+  border:1px solid var(--border);
+  border-radius:11px;
+  padding:12px;
+}
+.small{font-size:12px;color:var(--muted);margin-top:10px}
+@media(max-width:800px){
+  .header{display:block}
+  .tabs{margin-top:12px}
+  .layout{grid-template-columns:1fr}
+  pre{max-height:none}
+}
+</style>
+</head>
+<body>
+<main>
+  <div class="header">
+    <div>
+      <h1>PLTE Steg</h1>
+      <p>Encode messages inside unused indexed PNG palette entries.</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="encode">Encode</button>
+      <button class="tab" data-tab="decode">Decode</button>
+    </div>
+  </div>
+
+  <section id="encode" class="section active">
+    <div class="layout">
+      <div class="card">
+        <h2>Encode</h2>
+
+        <label>Indexed PNG</label>
+        <input id="encFile" type="file" accept="image/png">
+
+        <label>Password</label>
+        <input id="encPass" type="text">
+
+        <div class="message-row">
+          <label>Message</label>
+          <span id="charCounter">0/0</span>
+        </div>
+        <textarea id="msg" placeholder="Hidden message here."></textarea>
+
+        <button id="encodeBtn" disabled>Encode</button>
+        <a id="download" class="button" style="display:none" download="palette_stego.png">Download PNG</a>
+
+        <div class="small">Requires 8-bit indexed, non-interlaced PNG.</div>
+      </div>
+
+      <div class="card">
+        <h2>Encode Status</h2>
+        <pre id="encStatus">Ready.</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="decode" class="section">
+    <div class="layout">
+      <div class="card">
+        <h2>Decode</h2>
+
+        <label>Encoded PNG</label>
+        <input id="decFile" type="file" accept="image/png">
+
+        <label>Password</label>
+        <input id="decPass" type="text">
+
+        <button id="decodeBtn">Decode</button>
+
+        <div class="small">Use the same password used during encoding.</div>
+      </div>
+
+      <div class="card">
+        <h2>Decode Status</h2>
+        <pre id="decStatus">Ready.</pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const PNG_SIG = [137,80,78,71,13,10,26,10];
+const MAGIC = new TextEncoder().encode("PST2");
+
+const encFile = document.getElementById("encFile");
+const decFile = document.getElementById("decFile");
+const encPass = document.getElementById("encPass");
+const decPass = document.getElementById("decPass");
+const msg = document.getElementById("msg");
+const encodeBtn = document.getElementById("encodeBtn");
+const decodeBtn = document.getElementById("decodeBtn");
+const download = document.getElementById("download");
+const encStatus = document.getElementById("encStatus");
+const decStatus = document.getElementById("decStatus");
+const charCounter = document.getElementById("charCounter");
+
+let encPng = null;
+let encUsed = null;
+let encUnused = [];
+let encCapacityBytes = 0;
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  };
+});
+
+
+encFile.onchange = async () => {
+  download.style.display = "none";
+  encPng = null;
+  encUsed = null;
+  encUnused = [];
+  encCapacityBytes = 0;
+  updateCounter();
+
+  try {
+    const file = encFile.files[0];
+    if (!file) {
+      encStatus.textContent = "Ready.";
+      return;
+    }
+
+    encStatus.textContent = "Analyzing PNG...";
+
+    encPng = parsePng(new Uint8Array(await file.arrayBuffer()));
+    validatePng(encPng);
+
+    encUsed = await getUsedPaletteIndices(encPng);
+    encUnused = [];
+    for (let i = 0; i < 256; i++) if (!encUsed.has(i)) encUnused.push(i);
+
+    encCapacityBytes = Math.max(0, encUnused.length * 3 - 12);
+    updateCounter();
+
+    encStatus.textContent =
+      "Image analyzed\n" +
+      "Dimensions: " + encPng.width + " x " + encPng.height + "\n" +
+      "Used palette entries: " + encUsed.size + "\n" +
+      "Unused palette entries: " + encUnused.length + "\n" +
+      "Message capacity: " + encCapacityBytes + " bytes";
+  } catch (e) {
+    encStatus.textContent = "ERROR: " + e.message;
+    updateCounter();
+  }
+};
+
+msg.oninput = updateCounter;
+
+
+encodeBtn.onclick = async () => {
+  try {
+    if (!encPng || !encUsed) throw new Error("Choose and analyze an indexed PNG first.");
+
+    const png = encPng;
+    const used = encUsed;
+    const unused = encUnused;
+
+    const textBytes = new TextEncoder().encode(msg.value);
+    if (textBytes.length > encCapacityBytes) {
+      throw new Error("Message is over capacity.");
+    }
+
+    const pass = encPass.value || "";
+    const order = shuffle(unused, hashString("order:" + pass));
+
+    const plain = new Uint8Array(4 + 4 + 4 + textBytes.length);
+
+    plain.set(MAGIC, 0);
+    writeU32(plain, 4, textBytes.length);
+    writeU32(plain, 8, crc32(textBytes));
+    plain.set(textBytes, 12);
+
+    const encrypted = xorBytes(plain, hashString("crypt:" + pass));
+    const neededEntries = Math.ceil(encrypted.length / 3);
+
+    const palette = fullPalette(png.plte.data);
+    let bytePos = 0;
+    let maxTouched = png.plte.data.length / 3 - 1;
+
+    for (let i = 0; i < neededEntries; i++) {
+      const idx = order[i];
+      const p = idx * 3;
+      palette[p] = encrypted[bytePos++] ?? 0;
+      palette[p + 1] = encrypted[bytePos++] ?? 0;
+      palette[p + 2] = encrypted[bytePos++] ?? 0;
+      if (idx > maxTouched) maxTouched = idx;
+    }
+
+    const newPlte = palette.slice(0, (maxTouched + 1) * 3);
+    const out = rebuildPngWithNewPlte(png, newPlte);
+
+    const blob = new Blob([out], {type:"image/png"});
+    download.href = URL.createObjectURL(blob);
+    download.style.display = "inline-block";
+
+    encStatus.textContent =
+      "Encoded OK\n" +
+      "Download ready.";
+  } catch (e) {
+    encStatus.textContent = "ERROR: " + e.message;
+  }
+};
+
+decodeBtn.onclick = async () => {
+  try {
+    const file = decFile.files[0];
+    if (!file) throw new Error("Choose a PNG.");
+
+    const png = parsePng(new Uint8Array(await file.arrayBuffer()));
+    validatePng(png);
+
+    const used = await getUsedPaletteIndices(png);
+    const unused = [];
+    for (let i = 0; i < 256; i++) if (!used.has(i)) unused.push(i);
+
+    const pass = decPass.value || "";
+    const order = shuffle(unused, hashString("order:" + pass));
+    const palette = fullPalette(png.plte.data);
+
+    const raw = new Uint8Array(order.length * 3);
+    let pos = 0;
+
+    for (const idx of order) {
+      const p = idx * 3;
+      raw[pos++] = palette[p];
+      raw[pos++] = palette[p + 1];
+      raw[pos++] = palette[p + 2];
+    }
+
+    const decrypted = xorBytes(raw, hashString("crypt:" + pass));
+
+    for (let i = 0; i < MAGIC.length; i++) {
+      if (decrypted[i] !== MAGIC[i]) throw new Error("No valid message found. Wrong password or no payload.");
+    }
+
+    const len = readU32(decrypted, 4);
+    const expectedCrc = readU32(decrypted, 8);
+    const start = 12;
+    const end = start + len;
+
+    if (end > decrypted.length) throw new Error("Payload length is invalid.");
+
+    const payload = decrypted.slice(start, end);
+    const actualCrc = crc32(payload);
+
+    if (actualCrc !== expectedCrc) throw new Error("Checksum failed. Wrong password or damaged payload.");
+
+    decStatus.textContent = "Decoded OK\n\n" + new TextDecoder().decode(payload);
+  } catch (e) {
+    decStatus.textContent = "ERROR: " + e.message;
+  }
+};
+
+function updateCounter() {
+  const bytes = new TextEncoder().encode(msg.value).length;
+  const over = bytes > encCapacityBytes || !encPng;
+
+  charCounter.textContent = bytes + "/" + encCapacityBytes;
+  charCounter.classList.toggle("over", over);
+  encodeBtn.disabled = over;
+}
+
+function parsePng(bytes) {
+  for (let i = 0; i < PNG_SIG.length; i++) {
+    if (bytes[i] !== PNG_SIG[i]) throw new Error("Not a PNG.");
+  }
+
+  const chunks = [];
+  let pos = 8, ihdr = null, plte = null;
+  const idats = [];
+
+  while (pos < bytes.length) {
+    const len = readU32(bytes, pos);
+    const type = ascii(bytes.slice(pos + 4, pos + 8));
+    const dataStart = pos + 8;
+    const dataEnd = dataStart + len;
+    const fullEnd = dataEnd + 4;
+
+    if (fullEnd > bytes.length) throw new Error("Bad PNG chunk.");
+
+    const chunk = {
+      type,
+      data: bytes.slice(dataStart, dataEnd),
+      fullStart: pos,
+      fullEnd
+    };
+
+    chunks.push(chunk);
+    if (type === "IHDR") ihdr = chunk;
+    if (type === "PLTE") plte = chunk;
+    if (type === "IDAT") idats.push(chunk);
+
+    pos = fullEnd;
+    if (type === "IEND") break;
+  }
+
+  if (!ihdr) throw new Error("Missing IHDR.");
+  if (!plte) throw new Error("Missing PLTE.");
+
+  return {bytes, chunks, ihdr, plte, idats};
+}
+
+function validatePng(png) {
+  const d = png.ihdr.data;
+  png.width = readU32(d, 0);
+  png.height = readU32(d, 4);
+
+  if (d[8] !== 8) throw new Error("Only 8-bit indexed PNGs supported.");
+  if (d[9] !== 3) throw new Error("Not indexed-color PNG.");
+  if (d[12] !== 0) throw new Error("Interlaced PNGs not supported.");
+}
+
+async function getUsedPaletteIndices(png) {
+  const combined = concat(png.idats.map(c => c.data));
+  const inflated = await inflate(combined);
+
+  const used = new Set();
+  const rowBytes = png.width;
+  const stride = rowBytes + 1;
+  let prev = new Uint8Array(rowBytes);
+
+  for (let y = 0; y < png.height; y++) {
+    const start = y * stride;
+    const filter = inflated[start];
+    const scan = inflated.slice(start + 1, start + 1 + rowBytes);
+    const row = unfilter(scan, prev, filter);
+
+    for (const v of row) used.add(v);
+    prev = row;
+  }
+
+  return used;
+}
+
+function unfilter(scan, prev, type) {
+  const out = new Uint8Array(scan.length);
+
+  for (let i = 0; i < scan.length; i++) {
+    const left = i ? out[i - 1] : 0;
+    const up = prev[i] || 0;
+    const upLeft = i ? prev[i - 1] : 0;
+
+    let v;
+    if (type === 0) v = scan[i];
+    else if (type === 1) v = scan[i] + left;
+    else if (type === 2) v = scan[i] + up;
+    else if (type === 3) v = scan[i] + Math.floor((left + up) / 2);
+    else if (type === 4) v = scan[i] + paeth(left, up, upLeft);
+    else throw new Error("Unsupported PNG filter: " + type);
+
+    out[i] = v & 255;
+  }
+
+  return out;
+}
+
+function paeth(a,b,c) {
+  const p = a + b - c;
+  const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+  if (pa <= pb && pa <= pc) return a;
+  if (pb <= pc) return b;
+  return c;
+}
+
+async function inflate(data) {
+  if (!("DecompressionStream" in window)) {
+    throw new Error("Browser lacks DecompressionStream.");
+  }
+
+  const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+function rebuildPngWithNewPlte(png, newPlte) {
+  const parts = [new Uint8Array(PNG_SIG)];
+
+  for (const c of png.chunks) {
+    if (c.type === "PLTE") parts.push(makeChunk("PLTE", newPlte));
+    else parts.push(png.bytes.slice(c.fullStart, c.fullEnd));
+  }
+
+  return concat(parts);
+}
+
+function makeChunk(type, data) {
+  const typeBytes = new TextEncoder().encode(type);
+  const out = new Uint8Array(12 + data.length);
+
+  writeU32(out, 0, data.length);
+  out.set(typeBytes, 4);
+  out.set(data, 8);
+  writeU32(out, 8 + data.length, crc32(out.slice(4, 8 + data.length)));
+
+  return out;
+}
+
+function xorBytes(bytes, seed) {
+  const out = new Uint8Array(bytes.length);
+  const rng = mulberry32(seed);
+
+  for (let i = 0; i < bytes.length; i++) {
+    out[i] = bytes[i] ^ Math.floor(rng() * 256);
+  }
+
+  return out;
+}
+
+function shuffle(arr, seed) {
+  const out = arr.slice();
+  const rng = mulberry32(seed);
+
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+
+  return out;
+}
+
+function mulberry32(seed) {
+  return function() {
+    seed |= 0;
+    seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function hashString(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function fullPalette(plte) {
+  const out = new Uint8Array(768);
+  out.set(plte.slice(0, 768));
+  return out;
+}
+
+function concat(arrays) {
+  const len = arrays.reduce((n,a) => n + a.length, 0);
+  const out = new Uint8Array(len);
+  let p = 0;
+  for (const a of arrays) {
+    out.set(a, p);
+    p += a.length;
+  }
+  return out;
+}
+
+function readU32(b, o) {
+  return (((b[o] << 24) >>> 0) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]) >>> 0;
+}
+
+function writeU32(b, o, v) {
+  b[o] = (v >>> 24) & 255;
+  b[o+1] = (v >>> 16) & 255;
+  b[o+2] = (v >>> 8) & 255;
+  b[o+3] = v & 255;
+}
+
+function ascii(bytes) {
+  return Array.from(bytes, b => String.fromCharCode(b)).join("");
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const b of bytes) {
+    crc ^= b;
+    for (let i = 0; i < 8; i++) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+</script>
+</body>
+</html>
